@@ -31,7 +31,7 @@ bool Client::connect() {
     }
 }
 
-/
+
 void Client::disconnect() {
     if (connected_) {
         socket_.close();
