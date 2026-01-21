@@ -1,5 +1,4 @@
 #include "Server.h"
-#include "CommandExecutor.h"
 #include <iostream>
 #include <cstring>
 #include <sys/wait.h>
@@ -67,55 +66,6 @@ void Server::handleClientEcho(Socket& client_socket) {
     }
 }
 
-// Handle client - command execution mode
-void Server::handleClientCommand(Socket& client_socket) {
-    char buffer[BUFFER_SIZE];
-    
-    std::cout << "Client connected. Command execution mode enabled." << std::endl;
-    
-    while (true) {
-        
-        std::memset(buffer, 0, BUFFER_SIZE);  // Clear buffer
-        
-        ssize_t bytes_received = client_socket.recv(buffer, BUFFER_SIZE - 1, 0);   // Receive command from client
-        
-        if (bytes_received <= 0) {
-            if (bytes_received == 0) {
-                std::cout << "Client disconnected." << std::endl;
-            } else {
-                std::cerr << "Error receiving data." << std::endl;
-            }
-            break;
-        }
-        
-        std::string command(buffer, bytes_received);
-        std::cout << "Executing command: " << command << std::flush;
-        
-        // Execute command
-        CommandExecutor::Result result = CommandExecutor::execute(command);
-        
-        // Prepare response
-        std::string response;
-        if (!result.output.empty()) {
-            response = result.output;
-        } else {
-            response = "(no output)\n";
-        }
-        
-        // Add exit code if command failed
-        if (!result.success && result.exit_code >= 0) {
-            response += "[Exit code: " + std::to_string(result.exit_code) + "]\n";
-        }
-        
-        // Send response back to client
-        try {
-            client_socket.send(response.c_str(), response.length(), 0);
-        } catch (const std::exception& e) {
-            std::cerr << "Error sending response: " << e.what() << std::endl;
-            break;
-        }
-    }
-}
 
 // Main server -  loop
 void Server::run() {
