@@ -1,23 +1,26 @@
 #include "Server.h"
+#include "CommandExecutor.h"
 #include <iostream>
 #include <cstring>
 #include <sys/wait.h>
 #include <signal.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <vector>
 
 constexpr size_t BUFFER_SIZE = 4096;
 
 // Signal handler for SIGCHLD to reap zombie processes
 void sigchldHandler(int sig) {
-    (void)sig;  // Unused parameter
+    (void)sig;  
     
-    // Reap all dead child processes
     // Use WNOHANG to make waitpid non-blocking
     while (waitpid(-1, nullptr, WNOHANG) > 0) {
         // Keep reaping until no more dead children
     }
 }
 
-// Constructor
 Server::Server(int port) 
     : port_(port), running_(false), use_fork_(false), command_mode_(false) {
 }
@@ -35,7 +38,69 @@ void Server::start() {
     
     listen_socket_.listen(5); // Listen for connections
     
-    std::cout << "Server listening on port " << port_ << std::endl;
+    // Get all network interface IP addresses
+    struct ifaddrs *ifaddr, *ifa;
+    std::vector<std::string> ip_addresses;
+    
+    if (getifaddrs(&ifaddr) != -1) {
+        for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+            if (ifa->ifa_addr == nullptr) continue;
+            
+            // Check for IPv4
+            if (ifa->ifa_addr->sa_family == AF_INET) {
+                void* addr = &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
+                char addressBuffer[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, addr, addressBuffer, INET_ADDRSTRLEN);
+                
+                std::string ip(addressBuffer);
+                // Skip loopback
+                if (ip != "127.0.0.1") {
+                    ip_addresses.push_back(ip);
+                }
+            }
+        }
+        freeifaddrs(ifaddr);
+    }
+    
+    // Display server information with clear formatting
+    std::cout << "\n";
+    std::cout << "========================================" << std::endl;
+    std::cout << "    SERVER STARTED SUCCESSFULLY" << std::endl;
+    std::cout << "========================================" << std::endl;
+    std::cout << "Port: " << port_ << std::endl;
+    
+    if (!ip_addresses.empty()) {
+        std::cout << "\nAvailable on network:" << std::endl;
+        for (const auto& ip : ip_addresses) {
+            std::cout << "  • http://" << ip << ":" << port_ << std::endl;
+        }
+    }
+    
+    std::cout << "\nLocal connection:" << std::endl;
+    std::cout << "  • http://localhost:" << port_ << std::endl;
+    std::cout << "  • http://127.0.0.1:" << port_ << std::endl;
+    
+    std::cout << "\n----------------------------------------" << std::endl;
+    std::cout << "To connect from another computer, run:" << std::endl;
+    std::cout << "----------------------------------------" << std::endl;
+    
+    if (!ip_addresses.empty()) {
+        std::cout << "  ./client " << ip_addresses[0] << " " << port_ << std::endl;
+    } else {
+        std::cout << "  ./client <server-ip> " << port_ << std::endl;
+    }
+    
+    std::cout << "========================================" << std::endl;
+    
+    // Check firewall status and provide instructions
+    std::cout << "\n⚠️  FIREWALL NOTICE:" << std::endl;
+    std::cout << "If clients can't connect, allow port " << port_ << ":" << std::endl;
+    std::cout << "  sudo ufw allow " << port_ << "/tcp" << std::endl;
+    std::cout << "  sudo ufw status" << std::endl;
+    std::cout << "\nOr with iptables:" << std::endl;
+    std::cout << "  sudo iptables -A INPUT -p tcp --dport " << port_ << " -j ACCEPT" << std::endl;
+    std::cout << "========================================" << std::endl;
+    std::cout << "\nWaiting for connections..." << std::endl;
 }
 
 // Handle single client - echo mode
@@ -66,6 +131,56 @@ void Server::handleClientEcho(Socket& client_socket) {
     }
 }
 
+// Handle client - command execution mode 
+void Server::handleClientCommand(Socket& client_socket) {
+    char buffer[BUFFER_SIZE];
+    
+    std::cout << "Client connected. Command execution mode enabled." << std::endl;
+    
+    while (true) {
+        // Clear buffer
+        std::memset(buffer, 0, BUFFER_SIZE);
+        
+        // Receive command from client
+        ssize_t bytes_received = client_socket.recv(buffer, BUFFER_SIZE - 1, 0);
+        
+        if (bytes_received <= 0) {
+            if (bytes_received == 0) {
+                std::cout << "Client disconnected." << std::endl;
+            } else {
+                std::cerr << "Error receiving data." << std::endl;
+            }
+            break;
+        }
+        
+        std::string command(buffer, bytes_received);
+        std::cout << "Executing command: " << command << std::flush;
+        
+        // Execute command
+        CommandExecutor::Result result = CommandExecutor::execute(command);
+        
+        // Prepare response
+        std::string response;
+        if (!result.output.empty()) {
+            response = result.output;
+        } else {
+            response = "(no output)\n";
+        }
+        
+        // Add exit code if command failed
+        if (!result.success && result.exit_code >= 0) {
+            response += "[Exit code: " + std::to_string(result.exit_code) + "]\n";
+        }
+        
+        // Send response back to client
+        try {
+            client_socket.send(response.c_str(), response.length(), 0);
+        } catch (const std::exception& e) {
+            std::cerr << "Error sending response: " << e.what() << std::endl;
+            break;
+        }
+    }
+}
 
 // Main server -  loop
 void Server::run() {
