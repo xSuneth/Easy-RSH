@@ -11,12 +11,16 @@ private:
     int port_;
     bool running_;
     bool use_fork_;  
+    std::string current_dir_;  // Track current working directory
     
     // Handle single client connection 
     void handleClientEcho(Socket& client_socket);
     
     // Handle client with command execution 
     void handleClientCommand(Socket& client_socket);
+    
+    // Handle cd command specially
+    std::string handleCdCommand(const std::string& path);
     
 public:
     explicit Server(int port);
