@@ -55,6 +55,7 @@ int main(int argc, char* argv[]) {
         
         // Configure server
         server.setUseFork(use_fork);
+        server.setCommandMode(command_mode);
         
         // Start and run server
         server.start();
