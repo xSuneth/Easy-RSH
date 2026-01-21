@@ -7,10 +7,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-/**
- * RAII wrapper for socket file descriptors
- * Ensures sockets are properly closed when going out of scope
- */
+
 class Socket {
 private:
     int fd_;  // Socket file descriptor
@@ -39,4 +36,36 @@ public:
     // Check if socket is valid
     bool isValid() const;
 
-// TODO
+    // Close the socket manually
+    void close();
+    
+    // Reset with a new file descriptor
+    void reset(int new_fd = -1);
+    
+    // Create a new TCP socket
+    void create();
+    
+    // Bind socket to address and port
+    void bind(int port);
+    
+    // Listen for incoming connections
+    void listen(int backlog = 5);
+    
+    // Accept incoming connection (returns new Socket for client)
+    Socket accept(sockaddr_in& client_addr);
+    
+    // Connect to server
+    void connect(const std::string& host, int port);
+
+    // Send data
+    ssize_t send(const void* buffer, size_t length, int flags = 0);
+    
+    // Receive data
+    ssize_t recv(void* buffer, size_t length, int flags = 0);
+    
+    // Set socket options
+    void setReuseAddr(bool reuse);
+    void setNonBlocking(bool nonblocking);
+};
+
+#endif // SOCKET_H
