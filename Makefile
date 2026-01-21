@@ -17,9 +17,9 @@ INC_DIR = include
 BUILD_DIR = build
 
 # Source files
-COMMON_SRC = $(SRC_DIR)/Socket.cpp
-SERVER_SRC = $(COMMON_SRC) $(SRC_DIR)/Server.cpp $(SRC_DIR)/CommandExecutor.cpp $(SRC_DIR)/server_main.cpp
-CLIENT_SRC = $(COMMON_SRC) $(SRC_DIR)/Client.cpp $(SRC_DIR)/client_main.cpp
+COMMON_SRC = $(SRC_DIR)/socket/Socket.cpp
+SERVER_SRC = $(COMMON_SRC) $(SRC_DIR)/server/Server.cpp $(SRC_DIR)/server/CommandExecutor.cpp $(SRC_DIR)/server/server_main.cpp
+CLIENT_SRC = $(COMMON_SRC) $(SRC_DIR)/client/Client.cpp $(SRC_DIR)/client/client_main.cpp
 
 # Object files
 COMMON_OBJ = $(BUILD_DIR)/Socket.o
@@ -33,24 +33,28 @@ CLIENT_BIN = client
 # Targets
 .PHONY: all clean server client test help
 
-all: $(SERVER_BIN) $(CLIENT_BIN)
+all: server client
 
 # Build server
-server: $(SERVER_BIN)
-
-$(SERVER_BIN): $(SERVER_OBJ)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+server: $(SERVER_OBJ)
+	$(CXX) $(CXXFLAGS) -o $(SERVER_BIN) $^ $(LDFLAGS)
 	@echo "Built server successfully!"
 
 # Build client
-client: $(CLIENT_BIN)
-
-$(CLIENT_BIN): $(CLIENT_OBJ)
+client: $(CLIENT_OBJ)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 	@echo "Built client successfully!"
 
 # Compile source files to object files
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
+$(BUILD_DIR)/%.o: $(SRC_DIR)/socket/%.cpp
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/server/%.cpp
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/client/%.cpp
 	@mkdir -p $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
