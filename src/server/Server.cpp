@@ -1,5 +1,6 @@
 #include "Server.h"
 #include "CommandExecutor.h"
+#include "Colors.h"
 #include <iostream>
 #include <cstring>
 #include <sys/wait.h>
@@ -27,33 +28,23 @@ Server::Server(int port)
 
 // Start server
 void Server::start() {
-    std::cout << "Starting server on port " << port_ << "..." << std::endl;
+    listen_socket_.create();
+    listen_socket_.setReuseAddr(true);
+    listen_socket_.bind(port_);
+    listen_socket_.listen(5);
     
-    
-    listen_socket_.create();   // Create socket
-    
-    listen_socket_.setReuseAddr(true);       // Set SO_REUSEADDR to avoid "Address already in use" errors
-    
-    listen_socket_.bind(port_);  // Bind to port
-    
-    listen_socket_.listen(5); // Listen for connections
-    
-    // Get all network interface IP addresses
+    // Get network IP
     struct ifaddrs *ifaddr, *ifa;
     std::vector<std::string> ip_addresses;
     
     if (getifaddrs(&ifaddr) != -1) {
         for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
             if (ifa->ifa_addr == nullptr) continue;
-            
-            // Check for IPv4
             if (ifa->ifa_addr->sa_family == AF_INET) {
                 void* addr = &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
                 char addressBuffer[INET_ADDRSTRLEN];
                 inet_ntop(AF_INET, addr, addressBuffer, INET_ADDRSTRLEN);
-                
                 std::string ip(addressBuffer);
-                // Skip loopback
                 if (ip != "127.0.0.1") {
                     ip_addresses.push_back(ip);
                 }
@@ -62,52 +53,25 @@ void Server::start() {
         freeifaddrs(ifaddr);
     }
     
-    // Display server information with clear formatting
-    std::cout << "\n";
-    std::cout << "========================================" << std::endl;
-    std::cout << "    SERVER STARTED SUCCESSFULLY" << std::endl;
-    std::cout << "========================================" << std::endl;
-    std::cout << "Port: " << port_ << std::endl;
+    // Simple server info
+    std::cout << Color::PURPLE << "Server listening on port " << Color::BG_PURPLE << " " << port_ << " " << Color::RESET << std::endl;
     
     if (!ip_addresses.empty()) {
-        std::cout << "\nAvailable on network:" << std::endl;
-        for (const auto& ip : ip_addresses) {
-            std::cout << "  • http://" << ip << ":" << port_ << std::endl;
-        }
+        std::cout << Color::GRAY << "Network: " << ip_addresses[0] << ":" << port_ << Color::RESET << std::endl;
     }
-    
-    std::cout << "\nLocal connection:" << std::endl;
-    std::cout << "  • http://localhost:" << port_ << std::endl;
-    std::cout << "  • http://127.0.0.1:" << port_ << std::endl;
-    
-    std::cout << "\n----------------------------------------" << std::endl;
-    std::cout << "To connect from another computer, run:" << std::endl;
-    std::cout << "----------------------------------------" << std::endl;
+    std::cout << Color::GRAY << "Local:   127.0.0.1:" << port_ << Color::RESET << std::endl;
     
     if (!ip_addresses.empty()) {
-        std::cout << "  ./client " << ip_addresses[0] << " " << port_ << std::endl;
-    } else {
-        std::cout << "  ./client <server-ip> " << port_ << std::endl;
+        std::cout << Color::GRAY << "\nConnect: ./client " << ip_addresses[0] << " " << port_ << Color::RESET << std::endl;
     }
-    
-    std::cout << "========================================" << std::endl;
-    
-    // Check firewall status and provide instructions
-    std::cout << "\n⚠️  FIREWALL NOTICE:" << std::endl;
-    std::cout << "If clients can't connect, allow port " << port_ << ":" << std::endl;
-    std::cout << "  sudo ufw allow " << port_ << "/tcp" << std::endl;
-    std::cout << "  sudo ufw status" << std::endl;
-    std::cout << "\nOr with iptables:" << std::endl;
-    std::cout << "  sudo iptables -A INPUT -p tcp --dport " << port_ << " -j ACCEPT" << std::endl;
-    std::cout << "========================================" << std::endl;
-    std::cout << "\nWaiting for connections..." << std::endl;
+    std::cout << std::endl;
 }
 
 // Handle single client - echo mode
 void Server::handleClientEcho(Socket& client_socket) {
     char buffer[BUFFER_SIZE];
     
-    std::cout << "Client connected. Echo mode enabled." << std::endl;
+    std::cout << Color::GRAY << "Client connected (Echo mode)" << Color::RESET << std::endl;
     
     while (true) {
        
@@ -117,15 +81,15 @@ void Server::handleClientEcho(Socket& client_socket) {
         
         if (bytes_received <= 0) {
             if (bytes_received == 0) {
-                std::cout << "Client disconnected." << std::endl;
+                std::cout << Color::GRAY << "Client disconnected" << Color::RESET << std::endl;
             } else {
-                std::cerr << "Error receiving data." << std::endl;
+                std::cerr << Color::ROSE << "Error receiving data" << Color::RESET << std::endl;
             }
             break;
         }
         
         
-        std::cout << "Received: " << buffer; // Print received 
+        std::cout << Color::GRAY << "Received: " << Color::RESET << buffer; // Print received 
       
         client_socket.send(buffer, bytes_received, 0);   // Echo back to client
     }
@@ -135,7 +99,7 @@ void Server::handleClientEcho(Socket& client_socket) {
 void Server::handleClientCommand(Socket& client_socket) {
     char buffer[BUFFER_SIZE];
     
-    std::cout << "Client connected. Command execution mode enabled." << std::endl;
+    std::cout << Color::GRAY << "Client connected (Command mode)" << Color::RESET << std::endl;
     
     while (true) {
         // Clear buffer
@@ -146,15 +110,15 @@ void Server::handleClientCommand(Socket& client_socket) {
         
         if (bytes_received <= 0) {
             if (bytes_received == 0) {
-                std::cout << "Client disconnected." << std::endl;
+                std::cout << Color::GRAY << "Client disconnected" << Color::RESET << std::endl;
             } else {
-                std::cerr << "Error receiving data." << std::endl;
+                std::cerr << Color::ROSE << "Error receiving data" << Color::RESET << std::endl;
             }
             break;
         }
         
         std::string command(buffer, bytes_received);
-        std::cout << "Executing command: " << command << std::flush;
+        std::cout << Color::GRAY << "Executing: " << Color::BG_PURPLE << " " << command.substr(0, command.length()-1) << " " << Color::RESET << std::endl;
         
         // Execute command
         CommandExecutor::Result result = CommandExecutor::execute(command);
@@ -204,7 +168,7 @@ void Server::run() {
     while (running_) {
         try {
             sockaddr_in client_addr;
-            std::cout << "Waiting for client connection..." << std::endl;
+            std::cout << Color::DIM << "Waiting for connection..." << Color::RESET << std::endl;
             
             // Accept client connection
             Socket client_socket = listen_socket_.accept(client_addr);
@@ -212,8 +176,8 @@ void Server::run() {
             // Convert client address to string
             char client_ip[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
-            std::cout << "Client connected from " << client_ip 
-                      << ":" << ntohs(client_addr.sin_port) << std::endl;
+            std::cout << Color::PURPLE << "Connection from " << Color::BG_MINT << " " << client_ip 
+                      << ":" << ntohs(client_addr.sin_port) << " " << Color::RESET << std::endl;
             
             if (use_fork_) {
                 // Fork to handle client in separate process (Phase 2)
@@ -243,7 +207,7 @@ void Server::run() {
                     
                     // Parent process
                     client_socket.close();  // Parent doesn't need client socket
-                    std::cout << "Forked child process (PID: " << pid << ") to handle client" << std::endl;
+                    std::cout << Color::GRAY << "Spawned process (PID: " << pid << ")" << Color::RESET << std::endl;
                 }
             } else {
                 // Handle client in main process (Phase 1)
@@ -255,7 +219,7 @@ void Server::run() {
             }
             
         } catch (const std::exception& e) {
-            std::cerr << "Error: " << e.what() << std::endl;
+            std::cerr << Color::ROSE << "Error: " << e.what() << Color::RESET << std::endl;
             if (!use_fork_) {
                 // continue to accept new connections in single-client mode
                 continue;
@@ -268,16 +232,16 @@ void Server::run() {
 void Server::stop() {
     running_ = false;
     listen_socket_.close();
-    std::cout << "Server stopped." << std::endl;
+    std::cout << Color::GRAY << "\nServer stopped." << Color::RESET << std::endl;
 }
 
 // Enable or disable fork
 void Server::setUseFork(bool use_fork) {
     use_fork_ = use_fork;
     if (use_fork) {
-        std::cout << "Multi-client mode enabled (using fork)" << std::endl;
+        std::cout << Color::GRAY << "Mode: Multi-client (fork)" << Color::RESET << std::endl;
     } else {
-        std::cout << "Single-client mode (no fork)" << std::endl;
+        std::cout << Color::GRAY << "Mode: Single-client" << Color::RESET << std::endl;
     }
 }
 
@@ -285,8 +249,8 @@ void Server::setUseFork(bool use_fork) {
 void Server::setCommandMode(bool enable) {
     command_mode_ = enable;
     if (enable) {
-        std::cout << "Command execution mode enabled" << std::endl;
+        std::cout << Color::GRAY << "Mode: Command execution" << Color::RESET << std::endl;
     } else {
-        std::cout << "Echo mode enabled" << std::endl;
+        std::cout << Color::GRAY << "Mode: Echo" << Color::RESET << std::endl;
     }
 }
