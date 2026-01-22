@@ -1,5 +1,6 @@
 #include "Server.h"
 #include "CommandExecutor.h"
+#include "Auth.h"
 #include <iostream>
 #include <cstring>
 #include <sys/wait.h>
@@ -22,7 +23,8 @@ void sigchldHandler(int sig) {
 }
 
 Server::Server(int port) 
-    : port_(port), running_(false), use_fork_(false), command_mode_(false) {
+    : port_(port), running_(false), use_fork_(false), 
+      auth_(std::make_shared<Auth>()), require_auth_(true), command_mode_(false) {
 }
 
 // Start server
@@ -136,6 +138,17 @@ void Server::handleClientCommand(Socket& client_socket) {
     char buffer[BUFFER_SIZE];
     
     std::cout << "Client connected. Command execution mode enabled." << std::endl;
+    
+    // Perform authentication if required
+    std::string auth_token;
+    if (require_auth_) {
+        auth_token = authenticateClient(client_socket);
+        if (auth_token.empty()) {
+            std::cout << "Authentication failed. Disconnecting client." << std::endl;
+            return;
+        }
+        std::cout << "Client authenticated successfully." << std::endl;
+    }
     
     while (true) {
         // Clear buffer
@@ -289,4 +302,81 @@ void Server::setCommandMode(bool enable) {
     } else {
         std::cout << "Echo mode enabled" << std::endl;
     }
+}
+
+// Enable or disable authentication
+void Server::setRequireAuth(bool require) {
+    require_auth_ = require;
+    if (require) {
+        std::cout << "Authentication enabled" << std::endl;
+    } else {
+        std::cout << "Warning: Authentication disabled - server is insecure!" << std::endl;
+    }
+}
+
+// Get authentication module
+std::shared_ptr<Auth> Server::getAuth() {
+    return auth_;
+}
+
+// Perform authentication handshake with client
+std::string Server::authenticateClient(Socket& client_socket) {
+    char buffer[BUFFER_SIZE];
+    
+    // Send authentication request
+    const char* auth_prompt = "AUTH_REQUIRED\n";
+    client_socket.send(auth_prompt, strlen(auth_prompt), 0);
+    
+    // Receive credentials (format: "AUTH username:password")
+    std::memset(buffer, 0, BUFFER_SIZE);
+    ssize_t bytes_received = client_socket.recv(buffer, BUFFER_SIZE - 1, 0);
+    
+    if (bytes_received <= 0) {
+        std::cerr << "Failed to receive authentication credentials" << std::endl;
+        return "";
+    }
+    
+    std::string auth_msg(buffer, bytes_received);
+    
+    // Remove trailing newline
+    if (!auth_msg.empty() && auth_msg.back() == '\n') {
+        auth_msg.pop_back();
+    }
+    
+    // Parse AUTH command
+    if (auth_msg.find("AUTH ") != 0) {
+        std::cerr << "Invalid authentication message format" << std::endl;
+        const char* error_msg = "AUTH_FAILED Invalid format\n";
+        client_socket.send(error_msg, strlen(error_msg), 0);
+        return "";
+    }
+    
+    // Extract credentials
+    std::string credentials = auth_msg.substr(5); // Skip "AUTH "
+    size_t delimiter_pos = credentials.find(':');
+    
+    if (delimiter_pos == std::string::npos) {
+        std::cerr << "Invalid credentials format" << std::endl;
+        const char* error_msg = "AUTH_FAILED Invalid credentials format\n";
+        client_socket.send(error_msg, strlen(error_msg), 0);
+        return "";
+    }
+    
+    std::string username = credentials.substr(0, delimiter_pos);
+    std::string password = credentials.substr(delimiter_pos + 1);
+    
+    // Authenticate
+    std::string token = auth_->authenticate(username, password);
+    
+    if (token.empty()) {
+        const char* error_msg = "AUTH_FAILED Invalid username or password\n";
+        client_socket.send(error_msg, strlen(error_msg), 0);
+        return "";
+    }
+    
+    // Send success with token
+    std::string success_msg = "AUTH_SUCCESS " + token + "\n";
+    client_socket.send(success_msg.c_str(), success_msg.length(), 0);
+    
+    return token;
 }
