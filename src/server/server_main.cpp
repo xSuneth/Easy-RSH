@@ -1,7 +1,22 @@
 #include "Server.h"
+#include "Colors.h"
 #include <iostream>
 #include <cstdlib>
 #include <csignal>
+
+// ASCII Banner
+void printBanner() {
+    std::cout << Color::PURPLE << Color::BOLD;
+    std::cout << "\n";
+    std::cout << "  ███████╗ █████╗ ███████╗██╗   ██╗    ██████╗ ███████╗██╗  ██╗\n";
+    std::cout << "  ██╔════╝██╔══██╗██╔════╝╚██╗ ██╔╝    ██╔══██╗██╔════╝██║  ██║\n";
+    std::cout << "  █████╗  ███████║███████╗ ╚████╔╝     ██████╔╝███████╗███████║\n";
+    std::cout << "  ██╔══╝  ██╔══██║╚════██║  ╚██╔╝      ██╔══██╗╚════██║██╔══██║\n";
+    std::cout << "  ███████╗██║  ██║███████║   ██║       ██║  ██║███████║██║  ██║\n";
+    std::cout << "  ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝       ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝\n";
+    std::cout << Color::RESET;
+    std::cout << Color::GRAY << "                    Easy Remote Shell Server v1.0" << Color::RESET << "\n\n";
+}
 
 // Global server 
 Server* g_server = nullptr;
@@ -45,6 +60,9 @@ int main(int argc, char* argv[]) {
             }
         }
         
+        // Display banner
+        printBanner();
+        
         // Create server
         Server server(port);
         g_server = &server;
@@ -62,7 +80,7 @@ int main(int argc, char* argv[]) {
         server.run();
         
     } catch (const std::exception& e) {
-        std::cerr << "Fatal error: " << e.what() << std::endl;
+        std::cerr << Color::ROSE << "Fatal error: " << e.what() << Color::RESET << std::endl;
         return 1;
     }
     

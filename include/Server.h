@@ -15,6 +15,8 @@ private:
     bool use_fork_;  
     std::shared_ptr<Auth> auth_;  // Authentication module
     bool require_auth_;           // Whether authentication is required
+    std::string current_dir_;  // Track current working directory
+
     
     // Handle single client connection 
     void handleClientEcho(Socket& client_socket);
@@ -22,8 +24,9 @@ private:
     // Handle client with command execution 
     void handleClientCommand(Socket& client_socket);
     
-    // Perform authentication handshake with client
-    std::string authenticateClient(Socket& client_socket);
+
+    std::string authenticateClient(const std::string& path);
+
     
 public:
     explicit Server(int port);

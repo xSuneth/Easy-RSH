@@ -1,6 +1,8 @@
 #include "Client.h"
+#include "Colors.h"
 #include <iostream>
 #include <cstring>
+#include <sstream>
 
 constexpr size_t BUFFER_SIZE = 4096;
 
@@ -12,7 +14,7 @@ Client::Client(const std::string& host, int port)
 // Connect to server
 bool Client::connect() {
     try {
-        std::cout << "Connecting to " << server_host_ << ":" << server_port_ << "..." << std::endl;
+        std::cout << Color::GRAY << "Connecting to " << server_host_ << ":" << server_port_ << "..." << Color::RESET << std::endl;
         
         // Create socket
         socket_.create();
@@ -21,19 +23,17 @@ bool Client::connect() {
         socket_.connect(server_host_, server_port_);
         
         connected_ = true;
-        std::cout << "Connected successfully!" << std::endl;
-        
-        // Attempt authentication
+
+        std::cout << Color::PURPLE << "Connected to " << Color::BG_PURPLE << " " << server_host_ << ":" << server_port_ << " " << Color::RESET << std::endl;
         if (!performAuthentication()) {
             std::cerr << "Authentication failed" << std::endl;
             disconnect();
             return false;
         }
-        
         return true;
         
     } catch (const std::exception& e) {
-        std::cerr << "Connection failed: " << e.what() << std::endl;
+        std::cerr << Color::ROSE << "Connection failed: " << e.what() << Color::RESET << std::endl;
         connected_ = false;
         return false;
     }
@@ -44,7 +44,7 @@ void Client::disconnect() {
     if (connected_) {
         socket_.close();
         connected_ = false;
-        std::cout << "Disconnected from server." << std::endl;
+        std::cout << Color::GRAY << "\nDisconnected from server." << Color::RESET << std::endl;
     }
 }
 
@@ -77,19 +77,17 @@ std::string Client::sendCommand(const std::string& command) {
 
 void Client::runInteractiveShell() {
     if (!connected_) {
-        std::cerr << "Not connected to server. Call connect() first." << std::endl;
+        std::cerr << Color::ROSE << "Not connected to server. Call connect() first." << Color::RESET << std::endl;
         return;
     }
     
-    std::cout << "\n=== Remote Command Shell ===" << std::endl;
-    std::cout << "Type commands to execute on remote server." << std::endl;
-    std::cout << "Type 'exit' or 'quit' to disconnect.\n" << std::endl;
+    std::cout << "\n" << Color::GRAY << "Type 'exit' or 'quit' to disconnect." << Color::RESET << "\n" << std::endl;
     
     std::string input;
     
     while (connected_) {
         
-        std::cout << "remote> " << std::flush;
+        std::cout << Color::PURPLE << Color::BOLD << "remote" << Color::RESET << Color::GRAY << "> " << Color::RESET << std::flush;
         
         
         if (!std::getline(std::cin, input)) {
@@ -110,7 +108,7 @@ void Client::runInteractiveShell() {
         
     
         if (input == "exit" || input == "quit") {
-            std::cout << "Disconnecting..." << std::endl;
+            std::cout << Color::GRAY << "Disconnecting..." << Color::RESET << std::endl;
             break;
         }
      
@@ -126,14 +124,16 @@ void Client::runInteractiveShell() {
             std::string response = sendCommand(command);
             
             if (!response.empty()) {
-                std::cout << response;
-                if (response.back() != '\n') {
-                    std::cout << std::endl;
+                // Add left margin to output for visual separation
+                std::string line;
+                std::istringstream stream(response);
+                while (std::getline(stream, line)) {
+                    std::cout << Color::GRAY << "  │ " << Color::RESET << line << std::endl;
                 }
             }
             
         } catch (const std::exception& e) {
-            std::cerr << "Error: " << e.what() << std::endl;
+            std::cerr << Color::ROSE << "Error: " << e.what() << Color::RESET << std::endl;
             break;
         }
     }
