@@ -1,7 +1,7 @@
 # Compiler and flags
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -Wpedantic -Iinclude
-LDFLAGS = -lpthread
+LDFLAGS = -lpthread -lssl -lcrypto
 
 # Debug vs Release build
 DEBUG ?= 1
@@ -18,22 +18,23 @@ BUILD_DIR = build
 
 # Source files
 COMMON_SRC = $(SRC_DIR)/socket/Socket.cpp
-SERVER_SRC = $(COMMON_SRC) $(SRC_DIR)/server/Server.cpp $(SRC_DIR)/server/CommandExecutor.cpp $(SRC_DIR)/server/server_main.cpp
+SERVER_SRC = $(COMMON_SRC) $(SRC_DIR)/server/Server.cpp $(SRC_DIR)/server/CommandExecutor.cpp $(SRC_DIR)/server/Auth.cpp $(SRC_DIR)/server/server_main.cpp
 CLIENT_SRC = $(COMMON_SRC) $(SRC_DIR)/client/Client.cpp $(SRC_DIR)/client/client_main.cpp
 
 # Object files
 COMMON_OBJ = $(BUILD_DIR)/Socket.o
-SERVER_OBJ = $(COMMON_OBJ) $(BUILD_DIR)/Server.o $(BUILD_DIR)/CommandExecutor.o $(BUILD_DIR)/server_main.o
+SERVER_OBJ = $(COMMON_OBJ) $(BUILD_DIR)/Server.o $(BUILD_DIR)/CommandExecutor.o $(BUILD_DIR)/Auth.o $(BUILD_DIR)/server_main.o
 CLIENT_OBJ = $(COMMON_OBJ) $(BUILD_DIR)/Client.o $(BUILD_DIR)/client_main.o
 
 # Executables
 SERVER_BIN = server
 CLIENT_BIN = client
+ADDUSER_BIN = adduser
 
 # Targets
-.PHONY: all clean server client test help
+.PHONY: all clean server client test help adduser
 
-all: server client
+all: server client adduser
 
 # Build server
 server: $(SERVER_OBJ)
@@ -44,6 +45,11 @@ server: $(SERVER_OBJ)
 client: $(CLIENT_OBJ)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 	@echo "Built client successfully!"
+
+# Build adduser utility
+adduser: $(BUILD_DIR)/Auth.o $(BUILD_DIR)/adduser_main.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+	@echo "Built adduser utility successfully!"
 
 # Compile source files to object files
 $(BUILD_DIR)/%.o: $(SRC_DIR)/socket/%.cpp
@@ -60,14 +66,16 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/client/%.cpp
 
 # Dependencies (headers)
 $(BUILD_DIR)/Socket.o: $(INC_DIR)/Socket.h
-$(BUILD_DIR)/Server.o: $(INC_DIR)/Server.h $(INC_DIR)/Socket.h $(INC_DIR)/CommandExecutor.h
+$(BUILD_DIR)/Server.o: $(INC_DIR)/Server.h $(INC_DIR)/Socket.h $(INC_DIR)/CommandExecutor.h $(INC_DIR)/Auth.h
 $(BUILD_DIR)/Client.o: $(INC_DIR)/Client.h $(INC_DIR)/Socket.h
 $(BUILD_DIR)/CommandExecutor.o: $(INC_DIR)/CommandExecutor.h
+$(BUILD_DIR)/Auth.o: $(INC_DIR)/Auth.h
 $(BUILD_DIR)/server_main.o: $(INC_DIR)/Server.h
 $(BUILD_DIR)/client_main.o: $(INC_DIR)/Client.h
+$(BUILD_DIR)/adduser_main.o: $(INC_DIR)/Auth.h
 
 # Clean build artifacts
-clean:
+clean: $(ADDUSER_BIN)
 	rm -rf $(BUILD_DIR)/*.o $(SERVER_BIN) $(CLIENT_BIN)
 	@echo "Cleaned build artifacts"
 
@@ -81,9 +89,10 @@ help:
 	@echo "Makefile for Remote Command Execution System"
 	@echo ""
 	@echo "Targets:"
-	@echo "  all       - Build both server and client (default)"
+	@echo "  all       - Build server, client, and adduser utility (default)"
 	@echo "  server    - Build server only"
 	@echo "  client    - Build client only"
+	@echo "  adduser   - Build user management utility"
 	@echo "  clean     - Remove build artifacts"
 	@echo "  test      - Run basic tests"
 	@echo "  help      - Show this help message"
@@ -96,3 +105,4 @@ help:
 	@echo "  make              # Build with debug"
 	@echo "  make DEBUG=0      # Build optimized"
 	@echo "  make clean all    # Clean and rebuild"
+	@echo "  ./adduser admin password123  # Add a user"

@@ -14,6 +14,9 @@ private:
     std::string server_host_;
     int server_port_;
     bool connected_;
+    std::string auth_token_;       // Session token after authentication
+    std::string username_;         // Username for authentication
+    std::string password_;         // Password for authentication
     
 public:
     
@@ -28,6 +31,11 @@ public:
     void runInteractiveShell();    // Run interactive shell
     
     bool isConnected() const;      // Check if connected
+    
+    void setCredentials(const std::string& username, const std::string& password);  // Set authentication credentials
+    
+private:
+    bool performAuthentication();  // Perform authentication handshake
 };
 
 #endif // CLIENT_H

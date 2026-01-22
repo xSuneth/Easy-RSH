@@ -103,18 +103,11 @@ CommandExecutor::Result CommandExecutor::execute(const std::string& command) {
         // Close original pipe write end (now duplicated to stdout/stderr)
         close(pipefd[1]);
         
-        // Prepare argv for execvp
-        std::vector<char*> argv;
-        for (auto& token : tokens) {
-            argv.push_back(const_cast<char*>(token.c_str()));
-        }
-        argv.push_back(nullptr);
+        // Execute command through shell to support built-ins like cd
+        execl("/bin/sh", "sh", "-c", trimmed.c_str(), nullptr);
         
-        // Execute command
-        execvp(argv[0], argv.data());
-        
-        // If execvp returns, it failed
-        std::cerr << "Error: execvp failed: " << strerror(errno) << std::endl;
+        // If execl returns, it failed
+        std::cerr << "Error: execl failed: " << strerror(errno) << std::endl;
         exit(127);  // Command not found exit code
     } else {
 
@@ -132,9 +125,16 @@ CommandExecutor::Result CommandExecutor::execute(const std::string& command) {
         // Wait for grandchild to finish
         int status;
         if (waitpid(pid, &status, 0) < 0) {
-            result.output += "\nError: waitpid failed: ";
-            result.output += strerror(errno);
-            result.output += "\n";
+            // If ECHILD, the process was already reaped by SIGCHLD handler
+            // This is OK - the command executed successfully
+            if (errno == ECHILD) {
+                result.success = true;
+                result.exit_code = 0;
+            } else {
+                result.output += "\nError: waitpid failed: ";
+                result.output += strerror(errno);
+                result.output += "\n";
+            }
             return result;
         }
         

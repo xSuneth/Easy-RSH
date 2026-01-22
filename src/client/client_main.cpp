@@ -1,6 +1,21 @@
 #include "Client.h"
+#include "Colors.h"
 #include <iostream>
 #include <cstdlib>
+
+// ASCII Banner
+void printBanner() {
+    std::cout << Color::PURPLE << Color::BOLD;
+    std::cout << "\n";
+    std::cout << "  ███████╗ █████╗ ███████╗██╗   ██╗    ██████╗ ███████╗██╗  ██╗\n";
+    std::cout << "  ██╔════╝██╔══██╗██╔════╝╚██╗ ██╔╝    ██╔══██╗██╔════╝██║  ██║\n";
+    std::cout << "  █████╗  ███████║███████╗ ╚████╔╝     ██████╔╝███████╗███████║\n";
+    std::cout << "  ██╔══╝  ██╔══██║╚════██║  ╚██╔╝      ██╔══██╗╚════██║██╔══██║\n";
+    std::cout << "  ███████╗██║  ██║███████║   ██║       ██║  ██║███████║██║  ██║\n";
+    std::cout << "  ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝       ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝\n";
+    std::cout << Color::RESET;
+    std::cout << Color::GRAY << "                    Easy Remote Shell Client v1.0" << Color::RESET << "\n\n";
+}
 
 int main(int argc, char* argv[]) {
     try {
@@ -35,12 +50,15 @@ int main(int argc, char* argv[]) {
             }
         }
         
+        // Display banner
+        printBanner();
+        
         // Create client
         Client client(host, port);
         
         // Connect to server
         if (!client.connect()) {
-            std::cerr << "Failed to connect to server." << std::endl;
+            std::cerr << Color::ROSE << "Failed to connect to server." << Color::RESET << std::endl;
             return 1;
         }
         
@@ -48,7 +66,7 @@ int main(int argc, char* argv[]) {
         client.runInteractiveShell();
         
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        std::cerr << Color::ROSE << "Error: " << e.what() << Color::RESET << std::endl;
         return 1;
     }
     
