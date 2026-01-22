@@ -1,251 +1,209 @@
-# OpenSSL Authentication Implementation
+# Remote Command Execution System (Client–Server) with OpenSSL Authentication
 
-## Overview
-User authentication using SHA-256 hashing with salt has been successfully implemented using OpenSSL.
 
-## Features Implemented
+ ███████╗ █████╗ ███████╗██╗   ██╗    ██████╗ ███████╗██╗  ██╗
+ ██╔════╝██╔══██╗██╔════╝╚██╗ ██╔╝    ██╔══██╗██╔════╝██║  ██║
+ █████╗  ███████║███████╗ ╚████╔╝     ██████╔╝███████╗███████║
+ ██╔══╝  ██╔══██║╚════██║  ╚██╔╝      ██╔══██╗╚════██║██╔══██║
+ ███████╗██║  ██║███████║   ██║       ██║  ██║███████║██║  ██║
+ ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝       ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
+ Easy Remote Shell Server v1.0"
+ 
 
-### 1. **Authentication Module (`Auth.h`, `Auth.cpp`)**
-- SHA-256 password hashing with random salt
-- Session token generation and management
-- Session timeout (default: 30 minutes)
-- User management (add, authenticate, validate)
+A C++ TCP **client–server command execution system** that allows a remote client to connect to a server and execute shell commands securely using **SHA-256 + Salt password authentication** via **OpenSSL**.
 
-### 2. **Server-Side Authentication**
-- Authentication handshake before accepting commands
-- Session token validation
-- Configurable authentication requirement
+This system includes:
+- `server` : Remote command server (authentication + command execution)
+- `client` : Remote client for sending commands
+- `adduser`: Utility tool to add users into the user database (`users.txt`)
 
-### 3. **Client-Side Authentication**
-- Automatic authentication during connection
-- Username/password prompt
-- Session token storage
+---
 
-### 4. **User Management Utility (`adduser`)**
-- Command-line tool to add users
-- Secure password hashing
-- Users stored in `data/users.txt`
+## 📌 Key Features
 
-## Usage
+- **TCP socket-based client–server communication**
+- **Authentication using OpenSSL**
+  - SHA-256 hashing
+  - Random salt generation
+  - User credentials stored as: `username:salt:hash`
+- **Remote command execution**
+  - Executes shell commands on the server and returns output
+  - Supports `cd <path>` (directory switching handled specially)
+- **Session token issued after successful login**
 
-### Building the Project
+---
+
+## 🗂️ Project Structure
+
+```
+projects-team-1/
+│
+├── include/
+│   ├── Auth.h
+│   ├── Client.h
+│   ├── CommandExecutor.h
+│   ├── Colors.h
+│   ├── Server.h
+│   └── Socket.h
+│
+├── src/
+│   ├── socket/
+│   │   └── Socket.cpp
+│   │
+│   ├── server/
+│   │   ├── Auth.cpp
+│   │   ├── CommandExecutor.cpp
+│   │   ├── Server.cpp
+│   │   ├── server_main.cpp
+│   │   └── adduser_main.cpp
+│   │
+│   └── client/
+│       ├── Client.cpp
+│       └── client_main.cpp
+│
+├── data/
+│   └── users.txt
+│
+├── build/
+├── Makefile
+└── Documentation PDFs
+```
+
+---
+
+## ⚙️ Technologies Used
+
+- **C++17**
+- **POSIX TCP sockets**
+- **OpenSSL (`libssl`, `libcrypto`)**
+- **pthread / concurrency support**
+- Linux system APIs (`fork`, `exec`, `pipe`, `waitpid`, `chdir`, `getcwd`)
+
+---
+
+## ✅ Requirements
+
+### OS
+- Linux recommended (Ubuntu / Debian)
+
+### Compiler
+- `g++` with C++17 support
+
+### Libraries
+Install OpenSSL dev package:
+
+```bash
+sudo apt update
+sudo apt install build-essential libssl-dev make
+```
+
+---
+
+## 🔧 Build Instructions
+
+Build all components:
+
+```bash
+make
+```
+
+Clean and rebuild:
 
 ```bash
 make clean all
 ```
 
-This builds:
-- `server` - The command execution server with authentication
-- `client` - The client with authentication support
-- `adduser` - User management utility
-
-### Managing Users
-
-#### Add a new user:
-```bash
-./adduser <username> <password>
-
-# Example:
-./adduser admin admin123
-./adduser alice secretpass
-```
-
-#### View users (hashed):
-```bash
-cat data/users.txt
-```
-
-### Running the Server
+Build specific targets:
 
 ```bash
-# Run with authentication (default)
-./server -p 8080
-
-# The server now requires authentication by default
+make server
+make client
+make adduser
 ```
-
-### Running the Client
-
-```bash
-# Connect to server
-./client -h 192.168.8.109 -p 8080
-
-# You will be prompted:
-# Username: admin
-# Password: admin123
-```
-
-## Security Features
-
-### Password Security
-- **Salted hashing**: Each password has a unique random salt
-- **SHA-256**: Cryptographically secure hash function
-- **No plain text**: Passwords never stored in plain text
-
-### Session Security
-- **Random tokens**: 256-bit cryptographically random session tokens
-- **Session timeout**: Automatic expiration after inactivity
-- **Token validation**: Every command validates the session token
-
-### Authentication Flow
-
-```
-Client                          Server
-  |                               |
-  |------- Connect --------------->|
-  |<------ AUTH_REQUIRED ----------|
-  |                               |
-  |-- AUTH username:password ----->|
-  |                               | (verify credentials)
-  |<-- AUTH_SUCCESS token ---------|
-  |                               |
-  |-- CMD command ---------------->|
-  |                               | (validate token)
-  |<----- RESULT output ----------|
-```
-
-## File Structure
-
-```
-include/
-  └── Auth.h              # Authentication module header
-
-src/server/
-  ├── Auth.cpp           # Authentication implementation
-  ├── adduser_main.cpp   # User management utility
-  └── Server.cpp         # Updated with auth integration
-
-src/client/
-  └── Client.cpp         # Updated with auth client
-
-data/
-  └── users.txt          # User credentials (auto-created)
-```
-
-## Configuration
-
-### Server Configuration
-You can disable authentication (not recommended):
-```cpp
-Server server(8080);
-server.setRequireAuth(false);  // Disable authentication
-```
-
-### Session Timeout
-Default is 30 minutes. To change:
-```cpp
-Auth auth("data/users.txt", 60);  // 60 minutes timeout
-```
-
-## Testing
-
-1. **Create test users:**
-   ```bash
-   ./adduser admin admin123
-   ./adduser testuser password123
-   ```
-
-2. **Start server:**
-   ```bash
-   ./server -p 8080
-   ```
-
-3. **Connect client:**
-   ```bash
-   ./client -h localhost -p 8080
-   # Enter credentials when prompted
-   ```
-
-4. **Test authentication failure:**
-   - Try wrong password
-   - Should see "Authentication failed" message
-
-## Security Best Practices
-
-### Implemented ✅
-- Salted password hashing
-- Secure random token generation
-- Session timeout
-- No password transmission in plain text (within auth message)
-
-### Recommended Additions 🔐
-1. **TLS/SSL encryption** - Encrypt all network traffic
-2. **Password complexity requirements** - Enforce strong passwords
-3. **Rate limiting** - Prevent brute force attacks
-4. **Audit logging** - Log all authentication attempts
-5. **Password hiding** - Use termios to hide password input in client
-
-## Dependencies
-
-- **OpenSSL** (`libssl-dev`):
-  ```bash
-  sudo apt-get install libssl-dev
-  ```
-
-## Troubleshooting
-
-### Build Error: "openssl/sha.h: No such file or directory"
-```bash
-sudo apt-get install libssl-dev
-```
-
-### Authentication Always Fails
-- Check users file exists: `ls -la data/users.txt`
-- Verify user was added: `cat data/users.txt`
-- Ensure correct username/password
-
-### "User not found"
-- Add user: `./adduser <username> <password>`
-
-## API Reference
-
-### Auth Class
-
-#### Constructor
-```cpp
-Auth(const std::string& users_file = "data/users.txt", 
-     int timeout_minutes = 30);
-```
-
-#### Methods
-```cpp
-// Authenticate user, returns session token
-std::string authenticate(const std::string& username, 
-                        const std::string& password);
-
-// Validate session token
-bool validateToken(const std::string& token);
-
-// Add new user
-bool addUser(const std::string& username, 
-            const std::string& password);
-
-// Save users to file
-void saveUsers();
-
-// Revoke session
-void revokeToken(const std::string& token);
-
-// Update session activity
-void updateActivity(const std::string& token);
-
-// Clean expired sessions
-void cleanupExpiredSessions();
-```
-
-## Next Steps
-
-To further enhance security:
-
-1. **Add TLS/SSL**: Encrypt all client-server communication
-2. **Command whitelisting**: Restrict allowed commands per user
-3. **Role-based access control**: Different permission levels
-4. **Audit logging**: Track all user actions
-5. **Password strength validation**: Enforce complexity rules
-6. **Multi-factor authentication**: Add second factor
-7. **Password reset mechanism**: Secure password recovery
 
 ---
 
-**Status**: ✅ OpenSSL authentication fully implemented and tested
-**Date**: January 22, 2026
+## 👤 Add Users (Required)
+
+Before connecting, create at least one user:
+
+```bash
+./adduser <username> <password>
+```
+
+Example:
+
+```bash
+./adduser admin password123
+```
+
+This will write credentials to:
+
+```
+data/users.txt
+```
+
+---
+
+## ▶️ Running
+
+### 1) Start the Server
+```bash
+./server
+```
+
+### 2) Start the Client
+```bash
+./client
+```
+
+---
+
+## 🔐 Authentication Flow (High Level)
+
+1. Server requests authentication
+2. Client sends `username:password`
+3. Server verifies using `salt + SHA-256 hash`
+4. Server returns:
+   - ✅ `AUTH_SUCCESS <token>`
+   - ❌ `AUTH_FAILED ...`
+
+---
+
+## 💻 Remote Commands
+
+After authentication, you can run commands like:
+
+```bash
+ls
+pwd
+whoami
+date
+uname -a
+```
+
+### `cd` support
+```bash
+cd /home
+cd ..
+cd ~/Downloads
+```
+
+---
+
+## 🛡️ Security Notes
+
+✅ Implemented:
+- Passwords are not stored in plaintext
+- Salted SHA-256 hashing via OpenSSL
+
+⚠️ Possible future improvements:
+- TLS encryption for all communication
+- Argon2/bcrypt for stronger password hashing
+- Command sandboxing / allowlist
+- Rate limiting and auditing logs
+
+---
+
+## 📄 License
+Educational project (University coursework).
