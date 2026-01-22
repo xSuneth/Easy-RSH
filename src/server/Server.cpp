@@ -24,11 +24,8 @@ void sigchldHandler(int sig) {
 }
 
 Server::Server(int port) 
-
     : port_(port), running_(false), use_fork_(false), 
       auth_(std::make_shared<Auth>()), require_auth_(true), command_mode_(false) {
-
-    : port_(port), running_(false), use_fork_(false), command_mode_(false) {
     // Initialize with current working directory
     char cwd[1024];
     if (getcwd(cwd, sizeof(cwd)) != nullptr) {
@@ -36,7 +33,6 @@ Server::Server(int port)
     } else {
         current_dir_ = "/";
     }
-
 }
 
 // Start server

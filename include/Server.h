@@ -24,8 +24,11 @@ private:
     // Handle client with command execution 
     void handleClientCommand(Socket& client_socket);
     
-
-    std::string authenticateClient(const std::string& path);
+    // Authenticate a client
+    std::string authenticateClient(Socket& client_socket);
+    
+    // Handle cd command
+    std::string handleCdCommand(const std::string& path);
 
     
 public:
