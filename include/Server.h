@@ -16,6 +16,7 @@ private:
     std::shared_ptr<Auth> auth_;  // Authentication module
     bool require_auth_;           // Whether authentication is required
     std::string current_dir_;  // Track current working directory
+    bool restart_requested_;      // Flag to request server restart
 
     
     // Handle single client connection 
@@ -54,6 +55,9 @@ public:
     
     // Get authentication module
     std::shared_ptr<Auth> getAuth();
+    
+    // Check if restart was requested
+    bool isRestartRequested() const;
     
 private:
     bool command_mode_;  // True - execute commands, False - echo

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <csignal>
+#include <unistd.h>
 
 // ASCII Banner
 void printBanner() {
@@ -63,21 +64,34 @@ int main(int argc, char* argv[]) {
         // Display banner
         printBanner();
         
-        // Create server
-        Server server(port);
-        g_server = &server;
-        
-        // Register signal handlers
-        signal(SIGINT, signalHandler);
-        signal(SIGTERM, signalHandler);
-        
-        // Configure server
-        server.setUseFork(use_fork);
-        server.setCommandMode(command_mode);
-        
-        // Start and run server
-        server.start();
-        server.run();
+        // Restart loop
+        bool should_restart = true;
+        while (should_restart) {
+            // Create server
+            Server server(port);
+            g_server = &server;
+            
+            // Register signal handlers
+            signal(SIGINT, signalHandler);
+            signal(SIGTERM, signalHandler);
+            
+            // Configure server
+            server.setUseFork(use_fork);
+            server.setCommandMode(command_mode);
+            
+            // Start and run server
+            server.start();
+            server.run();
+            
+            // Check if restart was requested
+            if (server.isRestartRequested()) {
+                std::cout << Color::PURPLE << "\\n=== Restarting server ===\\n" << Color::RESET << std::endl;
+                // Small delay before restart
+                sleep(1);
+            } else {
+                should_restart = false;
+            }
+        }
         
     } catch (const std::exception& e) {
         std::cerr << Color::ROSE << "Fatal error: " << e.what() << Color::RESET << std::endl;
