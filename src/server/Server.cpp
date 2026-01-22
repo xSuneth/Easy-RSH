@@ -25,7 +25,8 @@ void sigchldHandler(int sig) {
 
 Server::Server(int port) 
     : port_(port), running_(false), use_fork_(false), 
-      auth_(std::make_shared<Auth>()), require_auth_(true), command_mode_(false) {
+      auth_(std::make_shared<Auth>()), require_auth_(true), 
+      restart_requested_(false), command_mode_(false) {
     // Initialize with current working directory
     char cwd[1024];
     if (getcwd(cwd, sizeof(cwd)) != nullptr) {
@@ -81,6 +82,17 @@ void Server::handleClientEcho(Socket& client_socket) {
     char buffer[BUFFER_SIZE];
     
     std::cout << Color::GRAY << "Client connected (Echo mode)" << Color::RESET << std::endl;
+    
+    // Perform authentication if required
+    std::string auth_token;
+    if (require_auth_) {
+        auth_token = authenticateClient(client_socket);
+        if (auth_token.empty()) {
+            std::cout << "Authentication failed. Disconnecting client." << std::endl;
+            return;
+        }
+        std::cout << "Client authenticated successfully." << std::endl;
+    }
     
     while (true) {
        
@@ -213,6 +225,14 @@ void Server::handleClientCommand(Socket& client_socket) {
         } else if (trimmed == "pwd" || trimmed == "pwd\n") {
             // Handle pwd command
             response = current_dir_ + "\n";
+        } else if (trimmed == "remoot" || trimmed == "remoot\n") {
+            // Handle server restart command
+            response = "Server restart requested. Restarting...\n";
+            client_socket.send(response.c_str(), response.length(), 0);
+            std::cout << Color::PURPLE << "Restart requested by client. Shutting down for restart..." << Color::RESET << std::endl;
+            restart_requested_ = true;
+            running_ = false;
+            return;
         } else {
             // Make sure we're in the correct directory before executing
             if (chdir(current_dir_.c_str()) != 0) {
@@ -367,6 +387,11 @@ void Server::setRequireAuth(bool require) {
 // Get authentication module
 std::shared_ptr<Auth> Server::getAuth() {
     return auth_;
+}
+
+// Check if restart was requested
+bool Server::isRestartRequested() const {
+    return restart_requested_;
 }
 
 // Perform authentication handshake with client
