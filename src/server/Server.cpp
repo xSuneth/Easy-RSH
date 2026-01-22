@@ -82,6 +82,17 @@ void Server::handleClientEcho(Socket& client_socket) {
     
     std::cout << Color::GRAY << "Client connected (Echo mode)" << Color::RESET << std::endl;
     
+    // Perform authentication if required
+    std::string auth_token;
+    if (require_auth_) {
+        auth_token = authenticateClient(client_socket);
+        if (auth_token.empty()) {
+            std::cout << "Authentication failed. Disconnecting client." << std::endl;
+            return;
+        }
+        std::cout << "Client authenticated successfully." << std::endl;
+    }
+    
     while (true) {
        
         std::memset(buffer, 0, BUFFER_SIZE);  // Clear buffer
