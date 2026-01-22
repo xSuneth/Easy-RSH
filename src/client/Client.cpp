@@ -23,7 +23,13 @@ bool Client::connect() {
         socket_.connect(server_host_, server_port_);
         
         connected_ = true;
+
         std::cout << Color::PURPLE << "Connected to " << Color::BG_PURPLE << " " << server_host_ << ":" << server_port_ << " " << Color::RESET << std::endl;
+        if (!performAuthentication()) {
+            std::cerr << "Authentication failed" << std::endl;
+            disconnect();
+            return false;
+        }
         return true;
         
     } catch (const std::exception& e) {
@@ -138,4 +144,79 @@ void Client::runInteractiveShell() {
 
 bool Client::isConnected() const {
     return connected_;
+}
+
+// Set authentication credentials
+void Client::setCredentials(const std::string& username, const std::string& password) {
+    username_ = username;
+    password_ = password;
+}
+
+// Perform authentication handshake
+bool Client::performAuthentication() {
+    char buffer[BUFFER_SIZE];
+    
+    // Wait for AUTH_REQUIRED message
+    std::memset(buffer, 0, BUFFER_SIZE);
+    ssize_t bytes_received = socket_.recv(buffer, BUFFER_SIZE - 1, 0);
+    
+    if (bytes_received <= 0) {
+        std::cerr << "Failed to receive authentication prompt" << std::endl;
+        return false;
+    }
+    
+    std::string prompt(buffer, bytes_received);
+    
+    // Check if server requires authentication
+    if (prompt.find("AUTH_REQUIRED") == std::string::npos) {
+        // Server doesn't require auth, we're good
+        std::cout << "Server does not require authentication" << std::endl;
+        return true;
+    }
+    
+    std::cout << "Server requires authentication" << std::endl;
+    
+    // Prompt for credentials if not set
+    if (username_.empty()) {
+        std::cout << "Username: " << std::flush;
+        std::getline(std::cin, username_);
+    }
+    
+    if (password_.empty()) {
+        std::cout << "Password: " << std::flush;
+        // In production, use termios to hide password input
+        std::getline(std::cin, password_);
+    }
+    
+    // Send credentials
+    std::string auth_msg = "AUTH " + username_ + ":" + password_ + "\n";
+    socket_.send(auth_msg.c_str(), auth_msg.length(), 0);
+    
+    // Receive authentication response
+    std::memset(buffer, 0, BUFFER_SIZE);
+    bytes_received = socket_.recv(buffer, BUFFER_SIZE - 1, 0);
+    
+    if (bytes_received <= 0) {
+        std::cerr << "Failed to receive authentication response" << std::endl;
+        return false;
+    }
+    
+    std::string response(buffer, bytes_received);
+    
+    if (response.find("AUTH_SUCCESS") == 0) {
+        // Extract token
+        size_t space_pos = response.find(' ');
+        if (space_pos != std::string::npos) {
+            auth_token_ = response.substr(space_pos + 1);
+            // Remove trailing newline
+            if (!auth_token_.empty() && auth_token_.back() == '\n') {
+                auth_token_.pop_back();
+            }
+        }
+        std::cout << "Authentication successful!" << std::endl;
+        return true;
+    } else {
+        std::cerr << "Authentication failed: " << response;
+        return false;
+    }
 }
