@@ -1,5 +1,6 @@
 #include "Server.h"
 #include "CommandExecutor.h"
+#include "Auth.h"
 #include "Colors.h"
 #include <iostream>
 #include <cstring>
@@ -23,7 +24,15 @@ void sigchldHandler(int sig) {
 }
 
 Server::Server(int port) 
-    : port_(port), running_(false), use_fork_(false), command_mode_(false) {
+    : port_(port), running_(false), use_fork_(false), 
+      auth_(std::make_shared<Auth>()), require_auth_(true), command_mode_(false) {
+    // Initialize with current working directory
+    char cwd[1024];
+    if (getcwd(cwd, sizeof(cwd)) != nullptr) {
+        current_dir_ = cwd;
+    } else {
+        current_dir_ = "/";
+    }
 }
 
 // Start server
@@ -95,11 +104,71 @@ void Server::handleClientEcho(Socket& client_socket) {
     }
 }
 
+// Handle cd command specially
+std::string Server::handleCdCommand(const std::string& path) {
+    std::string target_path = path;
+    
+    // Trim whitespace
+    size_t start = target_path.find_first_not_of(" \t\n\r");
+    size_t end = target_path.find_last_not_of(" \t\n\r");
+    if (start != std::string::npos) {
+        target_path = target_path.substr(start, end - start + 1);
+    }
+    
+    // Handle empty path (cd with no args goes to home)
+    if (target_path.empty()) {
+        const char* home = getenv("HOME");
+        if (home) {
+            target_path = home;
+        } else {
+            return "cd: HOME not set\n";
+        }
+    }
+    
+    // Handle ~ expansion
+    if (target_path[0] == '~') {
+        const char* home = getenv("HOME");
+        if (home) {
+            target_path = std::string(home) + target_path.substr(1);
+        }
+    }
+    
+    // Handle relative paths
+    if (target_path[0] != '/') {
+        target_path = current_dir_ + "/" + target_path;
+    }
+    
+    // Try to change directory
+    if (chdir(target_path.c_str()) == 0) {
+        // Update current directory
+        char cwd[1024];
+        if (getcwd(cwd, sizeof(cwd)) != nullptr) {
+            current_dir_ = cwd;
+            return "";  // Success, no output
+        } else {
+            return "cd: failed to get current directory\n";
+        }
+    } else {
+        return "cd: " + target_path + ": " + strerror(errno) + "\n";
+    }
+}
+
 // Handle client - command execution mode 
 void Server::handleClientCommand(Socket& client_socket) {
     char buffer[BUFFER_SIZE];
     
     std::cout << Color::GRAY << "Client connected (Command mode)" << Color::RESET << std::endl;
+    
+    // Perform authentication if required
+    std::string auth_token;
+    if (require_auth_) {
+        auth_token = authenticateClient(client_socket);
+        if (auth_token.empty()) {
+            std::cout << "Authentication failed. Disconnecting client." << std::endl;
+            return;
+        }
+        std::cout << "Client authenticated successfully." << std::endl;
+    }
     
     while (true) {
         // Clear buffer
@@ -120,20 +189,50 @@ void Server::handleClientCommand(Socket& client_socket) {
         std::string command(buffer, bytes_received);
         std::cout << Color::GRAY << "Executing: " << Color::BG_PURPLE << " " << command.substr(0, command.length()-1) << " " << Color::RESET << std::endl;
         
-        // Execute command
-        CommandExecutor::Result result = CommandExecutor::execute(command);
-        
-        // Prepare response
-        std::string response;
-        if (!result.output.empty()) {
-            response = result.output;
-        } else {
-            response = "(no output)\n";
+        // Check if it's a cd command
+        std::string trimmed = command;
+        size_t start = trimmed.find_first_not_of(" \t\n\r");
+        if (start != std::string::npos) {
+            trimmed = trimmed.substr(start);
         }
         
-        // Add exit code if command failed
-        if (!result.success && result.exit_code >= 0) {
-            response += "[Exit code: " + std::to_string(result.exit_code) + "]\n";
+        std::string response;
+        
+        if (trimmed.substr(0, 2) == "cd" && (trimmed.length() == 2 || trimmed[2] == ' ' || trimmed[2] == '\t' || trimmed[2] == '\n')) {
+            // Handle cd command
+            std::string path = trimmed.substr(2);
+            std::string cd_result = handleCdCommand(path);
+            
+            if (cd_result.empty()) {
+                // Success - send current directory as confirmation
+                response = current_dir_ + "\n";
+            } else {
+                // Error
+                response = cd_result;
+            }
+        } else if (trimmed == "pwd" || trimmed == "pwd\n") {
+            // Handle pwd command
+            response = current_dir_ + "\n";
+        } else {
+            // Make sure we're in the correct directory before executing
+            if (chdir(current_dir_.c_str()) != 0) {
+                response = "Error: Failed to change to working directory\n";
+            } else {
+                // Execute command
+                CommandExecutor::Result result = CommandExecutor::execute(command);
+                
+                // Prepare response
+                if (!result.output.empty()) {
+                    response = result.output;
+                } else {
+                    response = "(no output)\n";
+                }
+                
+                // Add exit code if command failed
+                if (!result.success && result.exit_code >= 0) {
+                    response += "[Exit code: " + std::to_string(result.exit_code) + "]\n";
+                }
+            }
         }
         
         // Send response back to client
@@ -253,4 +352,81 @@ void Server::setCommandMode(bool enable) {
     } else {
         std::cout << Color::GRAY << "Mode: Echo" << Color::RESET << std::endl;
     }
+}
+
+// Enable or disable authentication
+void Server::setRequireAuth(bool require) {
+    require_auth_ = require;
+    if (require) {
+        std::cout << "Authentication enabled" << std::endl;
+    } else {
+        std::cout << "Warning: Authentication disabled - server is insecure!" << std::endl;
+    }
+}
+
+// Get authentication module
+std::shared_ptr<Auth> Server::getAuth() {
+    return auth_;
+}
+
+// Perform authentication handshake with client
+std::string Server::authenticateClient(Socket& client_socket) {
+    char buffer[BUFFER_SIZE];
+    
+    // Send authentication request
+    const char* auth_prompt = "AUTH_REQUIRED\n";
+    client_socket.send(auth_prompt, strlen(auth_prompt), 0);
+    
+    // Receive credentials (format: "AUTH username:password")
+    std::memset(buffer, 0, BUFFER_SIZE);
+    ssize_t bytes_received = client_socket.recv(buffer, BUFFER_SIZE - 1, 0);
+    
+    if (bytes_received <= 0) {
+        std::cerr << "Failed to receive authentication credentials" << std::endl;
+        return "";
+    }
+    
+    std::string auth_msg(buffer, bytes_received);
+    
+    // Remove trailing newline
+    if (!auth_msg.empty() && auth_msg.back() == '\n') {
+        auth_msg.pop_back();
+    }
+    
+    // Parse AUTH command
+    if (auth_msg.find("AUTH ") != 0) {
+        std::cerr << "Invalid authentication message format" << std::endl;
+        const char* error_msg = "AUTH_FAILED Invalid format\n";
+        client_socket.send(error_msg, strlen(error_msg), 0);
+        return "";
+    }
+    
+    // Extract credentials
+    std::string credentials = auth_msg.substr(5); // Skip "AUTH "
+    size_t delimiter_pos = credentials.find(':');
+    
+    if (delimiter_pos == std::string::npos) {
+        std::cerr << "Invalid credentials format" << std::endl;
+        const char* error_msg = "AUTH_FAILED Invalid credentials format\n";
+        client_socket.send(error_msg, strlen(error_msg), 0);
+        return "";
+    }
+    
+    std::string username = credentials.substr(0, delimiter_pos);
+    std::string password = credentials.substr(delimiter_pos + 1);
+    
+    // Authenticate
+    std::string token = auth_->authenticate(username, password);
+    
+    if (token.empty()) {
+        const char* error_msg = "AUTH_FAILED Invalid username or password\n";
+        client_socket.send(error_msg, strlen(error_msg), 0);
+        return "";
+    }
+    
+    // Send success with token
+    std::string success_msg = "AUTH_SUCCESS " + token + "\n";
+    client_socket.send(success_msg.c_str(), success_msg.length(), 0);
+    
+    return token;
 }
