@@ -12,6 +12,10 @@ namespace Color {
     inline constexpr const char* MINT = "\033[38;5;158m";        // Pastel mint green
     inline constexpr const char* ROSE = "\033[38;5;211m";        // Pastel rose
     inline constexpr const char* GRAY = "\033[38;5;248m";        // Soft gray
+    inline constexpr const char* GREEN = "\033[38;5;114m";       // Success green
+    
+    // Theme color rgb(175, 135, 255) - User's custom purple
+    inline constexpr const char* THEME = "\033[38;2;175;135;255m";  // RGB theme color
     
     // Background highlights for important text
     inline constexpr const char* BG_PURPLE = "\033[48;5;141m\033[38;5;16m";  // Purple bg, dark text

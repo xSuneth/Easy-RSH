@@ -1,3 +1,16 @@
 #  build outputs
 *.o
 *.out
+
+# Binaries
+server
+client
+adduser
+
+# Configuration and data files
+data/server.conf
+data/users.txt
+data/backups/
+
+# Build directory
+build/

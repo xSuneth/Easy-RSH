@@ -125,7 +125,6 @@ std::string Auth::authenticate(const std::string& username, const std::string& p
     // Check if user exists
     auto it = users_.find(username);
     if (it == users_.end()) {
-        std::cout << "Authentication failed: User '" << username << "' not found" << std::endl;
         return "";
     }
 
@@ -134,7 +133,6 @@ std::string Auth::authenticate(const std::string& username, const std::string& p
     size_t delimiter_pos = stored.find(':');
     
     if (delimiter_pos == std::string::npos) {
-        std::cerr << "Error: Invalid user data format" << std::endl;
         return "";
     }
 
@@ -146,7 +144,6 @@ std::string Auth::authenticate(const std::string& username, const std::string& p
 
     // Compare hashes
     if (computed_hash != stored_hash) {
-        std::cout << "Authentication failed: Invalid password for user '" << username << "'" << std::endl;
         return "";
     }
 
@@ -161,8 +158,6 @@ std::string Auth::authenticate(const std::string& username, const std::string& p
     session.is_valid = true;
 
     sessions_[token] = session;
-
-    std::cout << "Authentication successful: User '" << username << "' logged in" << std::endl;
     
     return token;
 }

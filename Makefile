@@ -18,12 +18,12 @@ BUILD_DIR = build
 
 # Source files
 COMMON_SRC = $(SRC_DIR)/socket/Socket.cpp
-SERVER_SRC = $(COMMON_SRC) $(SRC_DIR)/server/Server.cpp $(SRC_DIR)/server/CommandExecutor.cpp $(SRC_DIR)/server/Auth.cpp $(SRC_DIR)/server/server_main.cpp
+SERVER_SRC = $(COMMON_SRC) $(SRC_DIR)/server/Server.cpp $(SRC_DIR)/server/CommandExecutor.cpp $(SRC_DIR)/server/Auth.cpp $(SRC_DIR)/server/Config.cpp $(SRC_DIR)/server/CLIUtils.cpp $(SRC_DIR)/server/SetupWizard.cpp $(SRC_DIR)/server/server_main.cpp
 CLIENT_SRC = $(COMMON_SRC) $(SRC_DIR)/client/Client.cpp $(SRC_DIR)/client/client_main.cpp
 
 # Object files
 COMMON_OBJ = $(BUILD_DIR)/Socket.o
-SERVER_OBJ = $(COMMON_OBJ) $(BUILD_DIR)/Server.o $(BUILD_DIR)/CommandExecutor.o $(BUILD_DIR)/Auth.o $(BUILD_DIR)/server_main.o
+SERVER_OBJ = $(COMMON_OBJ) $(BUILD_DIR)/Server.o $(BUILD_DIR)/CommandExecutor.o $(BUILD_DIR)/Auth.o $(BUILD_DIR)/Config.o $(BUILD_DIR)/CLIUtils.o $(BUILD_DIR)/SetupWizard.o $(BUILD_DIR)/server_main.o
 CLIENT_OBJ = $(COMMON_OBJ) $(BUILD_DIR)/Client.o $(BUILD_DIR)/client_main.o
 
 # Executables
@@ -70,7 +70,10 @@ $(BUILD_DIR)/Server.o: $(INC_DIR)/Server.h $(INC_DIR)/Socket.h $(INC_DIR)/Comman
 $(BUILD_DIR)/Client.o: $(INC_DIR)/Client.h $(INC_DIR)/Socket.h
 $(BUILD_DIR)/CommandExecutor.o: $(INC_DIR)/CommandExecutor.h
 $(BUILD_DIR)/Auth.o: $(INC_DIR)/Auth.h
-$(BUILD_DIR)/server_main.o: $(INC_DIR)/Server.h
+$(BUILD_DIR)/Config.o: $(INC_DIR)/Config.h
+$(BUILD_DIR)/CLIUtils.o: $(INC_DIR)/CLIUtils.h $(INC_DIR)/Colors.h
+$(BUILD_DIR)/SetupWizard.o: $(INC_DIR)/SetupWizard.h $(INC_DIR)/Config.h $(INC_DIR)/Auth.h $(INC_DIR)/CLIUtils.h
+$(BUILD_DIR)/server_main.o: $(INC_DIR)/Server.h $(INC_DIR)/Config.h $(INC_DIR)/SetupWizard.h $(INC_DIR)/CLIUtils.h
 $(BUILD_DIR)/client_main.o: $(INC_DIR)/Client.h
 $(BUILD_DIR)/adduser_main.o: $(INC_DIR)/Auth.h
 

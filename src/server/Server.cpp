@@ -10,6 +10,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <vector>
+#include <thread>
+#include <chrono>
+#include <fcntl.h>
 
 constexpr size_t BUFFER_SIZE = 4096;
 
@@ -81,17 +84,20 @@ void Server::start() {
 void Server::handleClientEcho(Socket& client_socket) {
     char buffer[BUFFER_SIZE];
     
-    std::cout << Color::GRAY << "Client connected (Echo mode)" << Color::RESET << std::endl;
+    std::cout << Color::DIM << "  Mode: Echo" << Color::RESET << std::endl;
     
     // Perform authentication if required
     std::string auth_token;
     if (require_auth_) {
+        std::cout << Color::DIM << "  ⏳ Authenticating..." << Color::RESET << std::flush;
         auth_token = authenticateClient(client_socket);
+        std::cout << "\r\033[K";  // Clear line
+        
         if (auth_token.empty()) {
-            std::cout << "Authentication failed. Disconnecting client." << std::endl;
+            std::cout << Color::ROSE << "  ✖ Authentication failed" << Color::RESET << std::endl;
             return;
         }
-        std::cout << "Client authenticated successfully." << std::endl;
+        std::cout << Color::GREEN << "  ✔ Authenticated" << Color::RESET << std::endl;
     }
     
     while (true) {
@@ -169,17 +175,20 @@ std::string Server::handleCdCommand(const std::string& path) {
 void Server::handleClientCommand(Socket& client_socket) {
     char buffer[BUFFER_SIZE];
     
-    std::cout << Color::GRAY << "Client connected (Command mode)" << Color::RESET << std::endl;
+    std::cout << Color::DIM << "  Mode: Command Execution" << Color::RESET << std::endl;
     
     // Perform authentication if required
     std::string auth_token;
     if (require_auth_) {
+        std::cout << Color::DIM << "  ⏳ Authenticating..." << Color::RESET << std::flush;
         auth_token = authenticateClient(client_socket);
+        std::cout << "\r\033[K";  // Clear line
+        
         if (auth_token.empty()) {
-            std::cout << "Authentication failed. Disconnecting client." << std::endl;
+            std::cout << Color::ROSE << "  ✖ Authentication failed" << Color::RESET << std::endl;
             return;
         }
-        std::cout << "Client authenticated successfully." << std::endl;
+        std::cout << Color::GREEN << "  ✔ Authenticated" << Color::RESET << std::endl;
     }
     
     while (true) {
@@ -287,16 +296,44 @@ void Server::run() {
     while (running_) {
         try {
             sockaddr_in client_addr;
-            std::cout << Color::DIM << "Waiting for connection..." << Color::RESET << std::endl;
             
-            // Accept client connection
-            Socket client_socket = listen_socket_.accept(client_addr);
+            // Animated spinner for waiting
+            const char spinner[] = {'/', '-', '\\', '|'};
+            int spinner_idx = 0;
+            
+            // Non-blocking accept with spinner
+            std::cout << Color::DIM << "\rWaiting for connection " << spinner[0] << Color::RESET << std::flush;
+            
+            // Set socket to non-blocking temporarily for spinner
+            int flags = fcntl(listen_socket_.get(), F_GETFL, 0);
+            fcntl(listen_socket_.get(), F_SETFL, flags | O_NONBLOCK);
+            
+            Socket client_socket;
+            while (running_) {
+                try {
+                    client_socket = listen_socket_.accept(client_addr);
+                    break;  // Connection received!
+                } catch (...) {
+                    // No connection yet, update spinner
+                    spinner_idx = (spinner_idx + 1) % 4;
+                    std::cout << "\rWaiting for connection " << Color::DIM << spinner[spinner_idx] << Color::RESET << std::flush;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+            }
+            
+            // Restore blocking mode
+            fcntl(listen_socket_.get(), F_SETFL, flags);
+            
+            if (!running_) break;
+            
+            // Clear spinner line
+            std::cout << "\r\033[K";
             
             // Convert client address to string
             char client_ip[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
-            std::cout << Color::PURPLE << "Connection from " << Color::BG_MINT << " " << client_ip 
-                      << ":" << ntohs(client_addr.sin_port) << " " << Color::RESET << std::endl;
+            std::cout << Color::THEME << "→ " << Color::RESET << "Connection from " 
+                      << Color::THEME << client_ip << ":" << ntohs(client_addr.sin_port) << Color::RESET << std::endl;
             
             if (use_fork_) {
                 // Fork to handle client in separate process (Phase 2)
