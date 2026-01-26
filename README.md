@@ -1,13 +1,14 @@
 # Remote Command Execution System (Client–Server) with OpenSSL Authentication
 
-
+```
  ███████╗ █████╗ ███████╗██╗   ██╗    ██████╗ ███████╗██╗  ██╗
  ██╔════╝██╔══██╗██╔════╝╚██╗ ██╔╝    ██╔══██╗██╔════╝██║  ██║
  █████╗  ███████║███████╗ ╚████╔╝     ██████╔╝███████╗███████║
  ██╔══╝  ██╔══██║╚════██║  ╚██╔╝      ██╔══██╗╚════██║██╔══██║
  ███████╗██║  ██║███████║   ██║       ██║  ██║███████║██║  ██║
  ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝       ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
- Easy Remote Shell Server v1.0"
+                    Easy Remote Shell Server v1.0
+```
  
 
 A C++ TCP **client–server command execution system** that allows a remote client to connect to a server and execute shell commands securely using **SHA-256 + Salt password authentication** via **OpenSSL**.
@@ -22,51 +23,58 @@ This system includes:
 ## 📌 Key Features
 
 - **TCP socket-based client–server communication**
-- **Authentication using OpenSSL**
-  - SHA-256 hashing
-  - Random salt generation
+- **Secure Authentication using OpenSSL**
+  - SHA-256 hashing with random salt
   - User credentials stored as: `username:salt:hash`
+  - Session tokens issued after successful login
+  - Token-based command authorization
 - **Remote command execution**
   - Executes shell commands on the server and returns output
   - Supports `cd <path>` (directory switching handled specially)
-- **Session token issued after successful login**
+  - Real-time output capture via pipes
+- **Multi-client support**
+  - Fork-based process model
+  - Concurrent client handling
+  - Automatic zombie process cleanup
 
 ---
 
 ## 🗂️ Project Structure
 
 ```
-projects-team-1/
+os-assignment/
 │
 ├── include/
-│   ├── Auth.h
-│   ├── Client.h
-│   ├── CommandExecutor.h
-│   ├── Colors.h
-│   ├── Server.h
-│   └── Socket.h
+│   ├── Auth.h              # Authentication & hashing logic
+│   ├── Client.h            # Client class interface
+│   ├── CommandExecutor.h   # Command execution handler
+│   ├── Colors.h            # Terminal color codes
+│   ├── Server.h            # Server class interface
+│   └── Socket.h            # RAII socket wrapper
 │
 ├── src/
 │   ├── socket/
-│   │   └── Socket.cpp
+│   │   └── Socket.cpp      # Socket implementation
 │   │
 │   ├── server/
-│   │   ├── Auth.cpp
-│   │   ├── CommandExecutor.cpp
-│   │   ├── Server.cpp
-│   │   ├── server_main.cpp
-│   │   └── adduser_main.cpp
+│   │   ├── Auth.cpp        # SHA-256 + Salt authentication
+│   │   ├── CommandExecutor.cpp  # Fork/exec/pipe command handling
+│   │   ├── Server.cpp      # Server logic & client handling
+│   │   ├── server_main.cpp # Server entry point
+│   │   └── adduser_main.cpp     # User creation utility
 │   │
 │   └── client/
-│       ├── Client.cpp
-│       └── client_main.cpp
+│       ├── Client.cpp      # Client implementation
+│       └── client_main.cpp # Client entry point
 │
 ├── data/
-│   └── users.txt
+│   └── users.txt           # User database (salt:hash)
 │
-├── build/
-├── Makefile
-└── Documentation PDFs
+├── build/                  # Compiled binaries
+├── Makefile               # Build configuration
+├── README.md              # This file
+├── ARCHITECTURE.md        # Detailed design document
+└── README_DETAILED.md     # Extended documentation
 ```
 
 ---
@@ -149,7 +157,8 @@ data/users.txt
 
 ### 1) Start the Server
 ```bash
-./server
+./server          # Run in single-process mode
+./server --fork   # Run with fork-based multi-client support (recommended)
 ```
 
 ### 2) Start the Client
@@ -157,16 +166,32 @@ data/users.txt
 ./client
 ```
 
+### 3) Login and Execute Commands
+```
+Enter username: admin
+Enter password: ********
+Authentication successful!
+
+Remote Shell> ls
+Remote Shell> pwd
+Remote Shell> cd /tmp
+Remote Shell> exit
+```
+
 ---
 
-## 🔐 Authentication Flow (High Level)
+## 🔐 Authentication Flow
 
-1. Server requests authentication
-2. Client sends `username:password`
-3. Server verifies using `salt + SHA-256 hash`
-4. Server returns:
-   - ✅ `AUTH_SUCCESS <token>`
-   - ❌ `AUTH_FAILED ...`
+1. **Connection:** Client connects to server
+2. **Credentials:** Client sends `username:password`
+3. **Verification:** Server:
+   - Retrieves stored salt for username
+   - Computes SHA-256 hash of `salt + password`
+   - Compares with stored hash
+4. **Response:** Server returns:
+   - ✅ `AUTH_SUCCESS <session_token>` on success
+   - ❌ `AUTH_FAILED <reason>` on failure
+5. **Authorization:** All subsequent commands require valid token
 
 ---
 
