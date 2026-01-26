@@ -2,10 +2,10 @@
 *.o
 *.out
 
-# Binaries
-server
-client
-adduser
+# Binaries (in root only)
+/server
+/client
+/adduser
 
 # Configuration and data files
 data/server.conf
