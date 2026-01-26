@@ -230,5 +230,28 @@ cd ~/Downloads
 
 ---
 
+## 🤝 Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+Areas we'd especially appreciate help with:
+- 🔒 Security enhancements (TLS/SSL, stronger hashing)
+- 🧪 Testing (unit tests, integration tests)
+- 📚 Documentation improvements
+- 🚀 Performance optimizations
+
+---
+
 ## 📄 License
-Educational project (University coursework).
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+**Note:** Originally developed as a university coursework project, now open-sourced for educational purposes.
+
+---
+
+## 🌟 Acknowledgments
+
+- Built using OpenSSL for cryptographic operations
+- Inspired by traditional Unix remote shell utilities
+- Educational project demonstrating OS concepts: processes, IPC, sockets, and authentication
