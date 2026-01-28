@@ -14,3 +14,8 @@ data/backups/
 
 # Build directory
 build/
+
+#binaries
+server
+client
+adduser
